@@ -1,173 +1,161 @@
 #include <iostream>
-#include<bits/stdc++.h>
 #include <fstream>
 #include <regex>
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include<vector>
-#include<map>
+#include <vector>
+#include <map>
+#include <algorithm>
+
 using namespace std;
+
 #define endl "\n"
-const int N = 2e6;
+const int MAX_NODES = 2e6;
 
+vector<string> documents;
+vector<string> paths;
+map<pair<string, int>, int> path_map;
+int node_count;
+vector<int> adjacency_list[MAX_NODES];
+vector<int> line_numbers_to_check[MAX_NODES];
+ofstream output_file;
+int visited[MAX_NODES];
+bool banned[MAX_NODES];
+int result_count = 0;
 
-vector<string> doc;
-vector<string> str;
-map<pair<string,int> ,int> mp;
-int n;
-vector<int> adj[N];
-string formatline (string &s) {
-    bool ok = 0;
-    string tmp = "";
+// Function to trim leading spaces from a string
+string formatLine(string &s) {
+    bool start = false;
+    string result = "";
     for (auto &c : s) {
-        if (c!=' ') {
-            ok = 1;
+        if (c != ' ') {
+            start = true;
         }
-        if (ok) {
-            tmp += c;
-        } 
+        if (start) {
+            result += c;
+        }
     }
-    return tmp;
+    return result;
 }
 
-void cal (string s) {
-    //cerr << s << endl;
-    string now = "";
-    int cnt = 0;
-    int last = -1;
-    for (int i = 46; i < (int) s.size(); i++) {
+// Function to process a file path and update the adjacency list
+void processFilePath(string s) {
+    string current_path = "";
+    int segment_count = 0;
+    int last_node = -1;
+    for (int i = 46; i < (int)s.size(); i++) {
         char c = s[i];
         if (c != '/') {
-            now += c;
+            current_path += c;
         }
-        if (c == '/' || i==(int)s.size() - 1) {
-            cnt++;
-            pair<string,int> cc = {now, cnt};
-            if (!mp.count (cc)) {
-                mp[cc] = ++n;
-                str.push_back(now);
+        if (c == '/' || i == (int)s.size() - 1) {
+            segment_count++;
+            pair<string, int> segment = {current_path, segment_count};
+            if (!path_map.count(segment)) {
+                path_map[segment] = ++node_count;
+                paths.push_back(current_path);
             }
-            if (last!=-1) {
-                adj[last].push_back (mp[cc]);
+            if (last_node != -1) {
+                adjacency_list[last_node].push_back(path_map[segment]);
             }
-            last = mp[cc];
-            now = "";
+            last_node = path_map[segment];
+            current_path = "";
         }
     }
 }
-void troll(const string& filePath, const vector<int> dak) {
-    cerr << filePath << endl;
+
+// Function to analyze a file and extract lines that need translation
+void analyzeFile(const string& filePath, const vector<int>& lines_to_check) {
+    cerr << "Processing file: " << filePath << endl;
     ifstream file(filePath);
     if (!file.is_open()) {
-        cerr << "Deo mo duoc: " << filePath << endl;
+        cerr << "Cannot open file: " << filePath << endl;
+        return;
     }
     string line;
-    int linenumber = 0;
-    int id = 0;
-    int cnt = 0;
-    vector<pair<int, string>> lines;
-    while (getline(file, line) && id < (int) dak.size()) {
-        linenumber++;
-        if (linenumber == dak[id]) {
-            id++;
-            //cout << linenumber << " " << id << endl;
-            if ((int) line.size() >= 6 && line.substr(0, 6)=="import") {
+    int line_number = 0;
+    int check_index = 0;
+    int relevant_line_count = 0;
+    vector<pair<int, string>> relevant_lines;
+    while (getline(file, line) && check_index < (int)lines_to_check.size()) {
+        line_number++;
+        if (line_number == lines_to_check[check_index]) {
+            check_index++;
+            if (line.size() >= 6 && line.substr(0, 6) == "import") {
                 continue;
-                
-            }
-            else {
-                cnt++;
-                lines.push_back({linenumber, line});
+            } else {
+                relevant_line_count++;
+                relevant_lines.push_back({line_number, line});
             }
         }
-       //cout << linenumber << endl;
     }
-    if (cnt) {
-        cal (filePath);
+    if (relevant_line_count > 0) {
+        processFilePath(filePath);
     }
-    //if (id < (int) dak.size()) cout << dak[id] << " " << id << endl;
 }
-ofstream fout;
-int vis[N];
-vector<int> S[N];
-int res = 0;
-bool ban[N];
-void dfs (int u, string cac, int cnt) {
-    vis[u] = 1;
-    string tmp = cac + "/" + str[u - 1];
+
+// Depth-First Search to traverse the directory structure
+void depthFirstSearch(int node, string current_path, int depth) {
+    visited[node] = 1;
+    string full_path = current_path + "/" + paths[node - 1];
     
-    if ((int)adj[u].size()==0) {
-        res++;
-        S[u].push_back(u);
+    if (adjacency_list[node].empty()) {
+        result_count++;
+        line_numbers_to_check[node].push_back(node);
     }
     
-    bool ok = 0;
-    for (int &v : adj[u]) {
-        if (vis[v]) continue;
-        dfs (v, tmp, cnt + 1);
-        ok |= ((int)adj[v].size()==0);
-        for (int &x : S[v]) {
-            S[u].push_back(x);
+    bool has_leaf = false;
+    for (int &neighbor : adjacency_list[node]) {
+        if (visited[neighbor]) continue;
+        depthFirstSearch(neighbor, full_path, depth + 1);
+        has_leaf |= adjacency_list[neighbor].empty();
+        for (int &leaf : line_numbers_to_check[neighbor]) {
+            line_numbers_to_check[node].push_back(leaf);
         }
     } 
     
-    if (cnt == 3) {
-        fout << tmp << " " << "has files: " << endl;
-        for (int &x : S[u]) {
-            if (!ban[x]) {
-                //res++;
-                fout << str[x - 1] << endl;
-                ban[x] = 1;
+    if (depth == 3 || (depth < 3 && has_leaf)) {
+        output_file << full_path << " has files: " << endl;
+        for (int &leaf : line_numbers_to_check[node]) {
+            if (!banned[leaf]) {
+                output_file << paths[leaf - 1] << endl;
+                banned[leaf] = 1;
             }
         }
-        //fout << "con cac" << endl;
-    }
-    else if (cnt < 3 && ok) {
-        fout << tmp << " " << "has files: " << endl;
-        for (int &x : S[u]) {
-            if (!ban[x]) {
-                //res++;
-                fout << str[x - 1] << endl;
-                ban[x] = 1;
-            }
-        }
-       // fout << "cac " << endl;
     }
 }
+
 int main() {
-    freopen("/home/chau/official-rakuna-app/output.txt", "r", stdin);
-    fout.open("/home/chau/files_need_translation_js.csv", ios::out | ios::app); 
+    freopen("/home/chau/path-to-output-file-maded-by-scanner/output.txt", "r", stdin);
+    output_file.open("/home/chau/files_need_translation_js.csv", ios::out | ios::app); 
     ios::sync_with_stdio(false);
     cin.tie(0);
-    string x;
+
+    string line;
+    while (getline(cin, line)) {
+        documents.push_back(line);
+    }
     
-    while (getline(cin, x)) {
-        doc.push_back (x);
-    }
-    string filePath = "";
-    vector<int> dak;
-    for (string &x : doc) {
-        if (x[0] >= '0' && x[0] <= '9') {
-            int num = 0;
-            for (char &c : x) {
-                num = num * 10 + (c - '0');
-            }
-            dak.push_back (num);
-        }
-        else {
-            sort (dak.begin(), dak.end());
-            dak.resize(unique (dak.begin(), dak.end()) - dak.begin());
-            troll (filePath, dak);
-            dak.clear();
-            filePath = x;
+    string current_file_path = "";
+    vector<int> lines_to_check;
+    for (string &line : documents) {
+        if (isdigit(line[0])) {
+            int line_number = stoi(line);
+            lines_to_check.push_back(line_number);
+        } else {
+            sort(lines_to_check.begin(), lines_to_check.end());
+            lines_to_check.erase(unique(lines_to_check.begin(), lines_to_check.end()), lines_to_check.end());
+            analyzeFile(current_file_path, lines_to_check);
+            lines_to_check.clear();
+            current_file_path = line;
         }
     }
-    if (filePath!="") {
-        troll (filePath, dak);
+    if (!current_file_path.empty()) {
+        analyzeFile(current_file_path, lines_to_check);
     }
-    dfs (1, "", 1);
-    cerr << res << " " << n << endl;
+    depthFirstSearch(1, "", 1);
+    cerr << "Result count: " << result_count << " Nodes processed: " << node_count << endl;
     return 0;
 }

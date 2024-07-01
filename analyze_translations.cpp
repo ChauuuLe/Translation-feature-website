@@ -12,20 +12,15 @@
 using namespace std;
 
 #define endl "\n"
-const int MAX_NODES = 2e6;
+const int N = 2e6;
 
 vector<string> documents;
 vector<string> paths;
 map<pair<string, int>, int> path_map;
 int node_count;
-vector<int> adjacency_list[MAX_NODES];
-vector<int> line_numbers_to_check[MAX_NODES];
-ofstream output_file;
-int visited[MAX_NODES];
-bool banned[MAX_NODES];
-int result_count = 0;
+vector<int> adjacency_list[N];
+ofstream fout1, fout2;
 
-// Function to trim leading spaces from a string
 string formatLine(string &s) {
     bool start = false;
     string result = "";
@@ -40,16 +35,13 @@ string formatLine(string &s) {
     return result;
 }
 
-// Function to process a file path and update the adjacency list
 void processFilePath(string s) {
     string current_path = "";
     int segment_count = 0;
     int last_node = -1;
     for (int i = 46; i < (int)s.size(); i++) {
         char c = s[i];
-        if (c != '/') {
-            current_path += c;
-        }
+        current_path += c;
         if (c == '/' || i == (int)s.size() - 1) {
             segment_count++;
             pair<string, int> segment = {current_path, segment_count};
@@ -61,19 +53,18 @@ void processFilePath(string s) {
                 adjacency_list[last_node].push_back(path_map[segment]);
             }
             last_node = path_map[segment];
-            current_path = "";
         }
     }
 }
 
-// Function to analyze a file and extract lines that need translation
 void analyzeFile(const string& filePath, const vector<int>& lines_to_check) {
     cerr << "Processing file: " << filePath << endl;
     ifstream file(filePath);
     if (!file.is_open()) {
-        cerr << "Cannot open file: " << filePath << endl;
+        cerr << "Cannot open: " << filePath << endl;
         return;
     }
+
     string line;
     int line_number = 0;
     int check_index = 0;
@@ -87,7 +78,10 @@ void analyzeFile(const string& filePath, const vector<int>& lines_to_check) {
                 continue;
             } else {
                 relevant_line_count++;
-                relevant_lines.push_back({line_number, line});
+                if (relevant_line_count == 1) {
+                    fout1 << filePath << endl;
+                }
+                fout1 << "Line: " << line_number << " " << line << endl;
             }
         }
     }
@@ -96,49 +90,54 @@ void analyzeFile(const string& filePath, const vector<int>& lines_to_check) {
     }
 }
 
-// Depth-First Search to traverse the directory structure
-void depthFirstSearch(int node, string current_path, int depth) {
-    visited[node] = 1;
-    string full_path = current_path + "/" + paths[node - 1];
+int visited[N];
+vector<int> subtree[N];
+int result_count = 0;
+bool banned[N];
+
+void showFile(string &s) {
+    string result = "";
+    for (int i = (int)s.size() - 1; i >= 0; i--) {
+        if (s[i] == '/') break;
+        result += s[i];
+    }
+    reverse(result.begin(), result.end());
+    fout2 << result << endl;
+}
+
+void depthFirstSearch(int u, string current_path, int depth) {
+    visited[u] = 1;
+    string temp_path = paths[u - 1];
     
-    if (adjacency_list[node].empty()) {
+    if (adjacency_list[u].empty()) {
         result_count++;
-        line_numbers_to_check[node].push_back(node);
+        subtree[u].push_back(u);
     }
     
     bool has_leaf = false;
-    for (int &neighbor : adjacency_list[node]) {
-        if (visited[neighbor]) continue;
-        depthFirstSearch(neighbor, full_path, depth + 1);
-        has_leaf |= adjacency_list[neighbor].empty();
-        for (int &leaf : line_numbers_to_check[neighbor]) {
-            line_numbers_to_check[node].push_back(leaf);
+    for (int &v : adjacency_list[u]) {
+        if (visited[v]) continue;
+        depthFirstSearch(v, temp_path, depth + 1);
+        has_leaf |= adjacency_list[v].empty();
+        for (int &leaf : subtree[v]) {
+            subtree[u].push_back(leaf);
         }
     } 
     
     if (depth == 3 || (depth < 3 && has_leaf)) {
-        output_file << full_path << " has files: " << endl;
-        for (int &leaf : line_numbers_to_check[node]) {
+        fout2 << temp_path << " has files: " << endl;
+        for (int &leaf : subtree[u]) {
             if (!banned[leaf]) {
-                output_file << paths[leaf - 1] << endl;
+                showFile(paths[leaf - 1]);
                 banned[leaf] = 1;
             }
         }
     }
 }
 
-int main() {
-    freopen("/home/chau/official-rakuna-app/output.txt", "r", stdin);
-    output_file.open("/home/chau/files_need_translation_js.csv", ios::out | ios::app); 
-    ios::sync_with_stdio(false);
-    cin.tie(0);
-
-    string line;
-    while (getline(cin, line)) {
-        documents.push_back(line);
-    }
-    
-    string current_file_path = "";
+void showWordsNeedTranslation() {
+    fout1.open("/cd-to-your-app/words_need_translation.csv", ios::out | ios::app);
+    string filePath = "";
     vector<int> lines_to_check;
     for (string &line : documents) {
         if (isdigit(line[0])) {
@@ -147,15 +146,31 @@ int main() {
         } else {
             sort(lines_to_check.begin(), lines_to_check.end());
             lines_to_check.erase(unique(lines_to_check.begin(), lines_to_check.end()), lines_to_check.end());
-            analyzeFile(current_file_path, lines_to_check);
+            analyzeFile(filePath, lines_to_check);
             lines_to_check.clear();
-            current_file_path = line;
+            filePath = line;
         }
     }
-    if (!current_file_path.empty()) {
-        analyzeFile(current_file_path, lines_to_check);
+    if (!filePath.empty()) {
+        analyzeFile(filePath, lines_to_check);
     }
+}
+
+void showFilesDirectory() {
+    fout2.open("/cd-to-your-app/files_need_translation.csv", ios::out | ios::app);
     depthFirstSearch(1, "", 1);
+}
+
+int main() {
+    freopen("/cd-to-your-app/output.txt", "r", stdin);
+    ios::sync_with_stdio(false);
+    cin.tie(0);
+    string line;
+    while (getline(cin, line)) {
+        documents.push_back(line);
+    }
+    showWordsNeedTranslation();
+    showFilesDirectory();
     cerr << "Result count: " << result_count << " Nodes processed: " << node_count << endl;
     return 0;
 }

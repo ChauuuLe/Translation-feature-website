@@ -46,7 +46,7 @@ module.exports = {
     const lines = content.split('\n');
 
     // Open the output file for appending
-    const outputFilePath = path.resolve(__dirname, 'output.txt');
+    const outputFilePath = path.resolve(__dirname, 'linesNeedToBeConsider.txt');
     const outputStream = fs.createWriteStream(outputFilePath, { flags: 'a' });
 
     // Log the file path and number of lines

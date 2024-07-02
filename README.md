@@ -301,7 +301,7 @@ void showFile(string &s) {
     fout2 << result << endl;
 }
 
-void depthFirstSearch(int u, string current_path, int depth) {
+void depthFirstSearch(int u, int depth) {
     visited[u] = 1;
     string temp_path = paths[u - 1];
     
@@ -354,7 +354,7 @@ void showWordsNeedTranslation() {
 
 void showFilesDirectory() {
     fout2.open("/cd-to-your-app/files_need_translation.csv", ios::out | ios::app);
-    depthFirstSearch(1, "", 1);
+    depthFirstSearch(1, 1);
 }
 
 int main() {

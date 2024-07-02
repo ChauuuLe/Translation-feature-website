@@ -39,7 +39,7 @@ void processFilePath(string s) {
     string current_path = "";
     int segment_count = 0;
     int last_node = -1;
-    for (int i = 46; i < (int)s.size(); i++) {
+    for (int i = 0; i < (int)s.size(); i++) {
         char c = s[i];
         current_path += c;
         if (c == '/' || i == (int)s.size() - 1) {
@@ -105,7 +105,7 @@ void showFile(string &s) {
     fout2 << result << endl;
 }
 
-void depthFirstSearch(int u, string current_path, int depth) {
+void depthFirstSearch(int u, int depth) {
     visited[u] = 1;
     string temp_path = paths[u - 1];
     
@@ -117,7 +117,7 @@ void depthFirstSearch(int u, string current_path, int depth) {
     bool has_leaf = false;
     for (int &v : adjacency_list[u]) {
         if (visited[v]) continue;
-        depthFirstSearch(v, temp_path, depth + 1);
+        depthFirstSearch(v, depth + 1);
         has_leaf |= adjacency_list[v].empty();
         for (int &leaf : subtree[v]) {
             subtree[u].push_back(leaf);
@@ -158,7 +158,7 @@ void showWordsNeedTranslation() {
 
 void showFilesDirectory() {
     fout2.open("/cd-to-your-app/files_need_translation.csv", ios::out | ios::app);
-    depthFirstSearch(1, "", 1);
+    depthFirstSearch(1, 1);
 }
 
 int main() {
